@@ -1,15 +1,11 @@
 from lib.db.connection import get_connection
+from lib.db.schema import create_tables
 
-def setup_database():
+def initialize_db():
     conn = get_connection()
-    cursor = conn.cursor()
-    
-    with open('lib/db/schema.sql', 'r') as f:
-        cursor.executescript(f.read())
-    
-    conn.commit()
+    create_tables(conn)
     conn.close()
+    print("Database tables created successfully")
 
 if __name__ == '__main__':
-    setup_database()
-    print("Database setup complete!")
+    initialize_db()
