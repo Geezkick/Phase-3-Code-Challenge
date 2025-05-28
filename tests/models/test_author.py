@@ -88,3 +88,20 @@ class Author:
             name=row['name'],
             category=row['category']
         ) for row in rows]
+    print("Loading test_author.py")
+from lib.models.author import Author
+
+def test_author_find_by_name(setup_database):
+    print("Running test_author_find_by_name")
+    author = Author.find_by_name("Test Author")
+    print(f"Author found: {author}")
+    assert author is not None
+    assert author.name == "Test Author"
+
+def test_author_articles(setup_database):
+    print("Running test_author_articles")
+    author = Author.find_by_name("Test Author")
+    articles = author.articles()
+    print(f"Articles: {[article.title for article in articles]}")
+    assert len(articles) == 1
+    assert articles[0].title == "Test Article"
