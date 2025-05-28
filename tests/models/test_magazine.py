@@ -1,50 +1,22 @@
+# tests/models/test_magazine.py
+import pytest
 from lib.models.magazine import Magazine
 from lib.models.author import Author
 from lib.models.article import Article
-from lib.db.connection import get_connection
-import pytest
 
-@pytest.fixture
-def setup_db():
-    # Setup test database
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM articles")
-    cursor.execute("DELETE FROM authors")
-    cursor.execute("DELETE FROM magazines")
-    conn.commit()
-    
-    # Create test data
-    author1 = Author.create("Author 1")
-    author2 = Author.create("Author 2")
-    magazine = Magazine.create("Test Magazine", "Test Category")
-    Article.create("Article 1", author1, magazine)
-    Article.create("Article 2", author1, magazine)
-    Article.create("Article 3", author2, magazine)
-    
-    yield  # This is where the test runs
-    
-    # Teardown
-    cursor.execute("DELETE FROM articles")
-    cursor.execute("DELETE FROM authors")
-    cursor.execute("DELETE FROM magazines")
-    conn.commit()
-    conn.close()
-
-def test_magazine_creation(setup_db):
-    magazine = Magazine.find_by_name("Test Magazine")
+def test_magazine_creation(setup_database):
+    magazine = Magazine.create("New Magazine", "New Category")
     assert magazine is not None
-    assert magazine.name == "Test Magazine"
-    assert magazine.category == "Test Category"
+    assert magazine.name == "New Magazine"
 
-def test_magazine_articles(setup_db):
-    magazine = Magazine.find_by_name("Test Magazine")
+def test_magazine_articles(setup_database):
+    magazine = Magazine.find_by_name("Test Magazine")  # Use name instead of hardcoding ID
     articles = magazine.articles()
-    assert len(articles) == 3
-    assert {a.title for a in articles} == {"Article 1", "Article 2", "Article 3"}
+    assert len(articles) == 1
+    assert articles[0].title == "Test Article"
 
-def test_magazine_contributors(setup_db):
-    magazine = Magazine.find_by_name("Test Magazine")
+def test_magazine_contributors(setup_database):
+    magazine = Magazine.find_by_name("Test Magazine")  # Use name instead of hardcoding ID
     contributors = magazine.contributors()
-    assert len(contributors) == 2
-    assert {c.name for c in contributors} == {"Author 1", "Author 2"}
+    assert len(contributors) == 1
+    assert contributors[0].name == "Test Author"

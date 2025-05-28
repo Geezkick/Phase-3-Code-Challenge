@@ -1,70 +1,39 @@
+# lib/models/article.py
 from lib.db.connection import get_connection
+import sqlite3
 
 class Article:
-    def __init__(self, id=None, title=None, author_id=None, magazine_id=None):
+    def __init__(self, id=None, title=None, content=None, author_id=None, magazine_id=None):
         self.id = id
         self.title = title
+        self.content = content
         self.author_id = author_id
         self.magazine_id = magazine_id
+
+    @classmethod
+    def create(cls, title, content, author_id, magazine_id):
+        article = cls(title=title, content=content, author_id=author_id, magazine_id=magazine_id)
+        article.save()
+        return article
 
     def save(self):
         conn = get_connection()
         cursor = conn.cursor()
-        if self.id:
-            cursor.execute("""
-                UPDATE articles 
-                SET title=?, author_id=?, magazine_id=? 
-                WHERE id=?
-            """, (self.title, self.author_id, self.magazine_id, self.id))
-        else:
-            cursor.execute("""
-                INSERT INTO articles (title, author_id, magazine_id) 
-                VALUES (?, ?, ?)
-            """, (self.title, self.author_id, self.magazine_id))
-            self.id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-
-    def delete(self):
-        if self.id:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM articles WHERE id=?", (self.id,))
+        try:
+            if self.id:
+                cursor.execute(
+                    "UPDATE articles SET title=?, content=?, author_id=?, magazine_id=? WHERE id=?",
+                    (self.title, self.content, self.author_id, self.magazine_id, self.id)
+                )
+            else:
+                cursor.execute(
+                    "INSERT INTO articles (title, content, author_id, magazine_id) VALUES (?, ?, ?, ?)",
+                    (self.title, self.content, self.author_id, self.magazine_id)
+                )
+                self.id = cursor.lastrowid
             conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise e
+        finally:
             conn.close()
-
-    @classmethod
-    def create(cls, title, author, magazine):
-        article = cls(title=title, author_id=author.id, magazine_id=magazine.id)
-        article.save()
-        return article
-
-    @classmethod
-    def find_by_id(cls, id):
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM articles WHERE id=?", (id,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return cls(id=row['id'], title=row['title'], 
-                      author_id=row['author_id'], magazine_id=row['magazine_id'])
-        return None
-
-    @classmethod
-    def find_by_title(cls, title):
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM articles WHERE title=?", (title,))
-        rows = cursor.fetchall()
-        conn.close()
-        return [cls(id=row['id'], title=row['title'], 
-                   author_id=row['author_id'], magazine_id=row['magazine_id']) for row in rows]
-
-    def author(self):
-        from lib.models.author import Author
-        return Author.find_by_id(self.author_id)
-
-    def magazine(self):
-        from lib.models.magazine import Magazine
-        return Magazine.find_by_id(self.magazine_id)

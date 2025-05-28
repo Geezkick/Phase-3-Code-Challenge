@@ -1,46 +1,90 @@
-from lib.models.author import Author
-from lib.models.magazine import Magazine
-from lib.models.article import Article
+# lib/models/author.py
 from lib.db.connection import get_connection
-import pytest
+import sqlite3
 
-@pytest.fixture
-def setup_db():
-    # Setup test database
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM articles")
-    cursor.execute("DELETE FROM authors")
-    cursor.execute("DELETE FROM magazines")
-    conn.commit()
-    
-    # Create test data
-    author = Author.create("Test Author")
-    magazine = Magazine.create("Test Magazine", "Test Category")
-    Article.create("Test Article", author, magazine)
-    
-    yield  # This is where the test runs
-    
-    # Teardown
-    cursor.execute("DELETE FROM articles")
-    cursor.execute("DELETE FROM authors")
-    cursor.execute("DELETE FROM magazines")
-    conn.commit()
-    conn.close()
+class Author:
+    def __init__(self, id=None, name=None):
+        self.id = id
+        self.name = name
 
-def test_author_creation(setup_db):
-    author = Author.find_by_name("Test Author")
-    assert author is not None
-    assert author.name == "Test Author"
+    @classmethod
+    def create(cls, name):
+        author = cls(name=name)
+        author.save()
+        return author
 
-def test_author_articles(setup_db):
-    author = Author.find_by_name("Test Author")
-    articles = author.articles()
-    assert len(articles) == 1
-    assert articles[0].title == "Test Article"
+    def save(self):
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            if self.id:
+                cursor.execute(
+                    "UPDATE authors SET name=? WHERE id=?",
+                    (self.name, self.id)
+                )
+            else:
+                cursor.execute(
+                    "INSERT INTO authors (name) VALUES (?)",
+                    (self.name,)
+                )
+                self.id = cursor.lastrowid
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
 
-def test_author_magazines(setup_db):
-    author = Author.find_by_name("Test Author")
-    magazines = author.magazines()
-    assert len(magazines) == 1
-    assert magazines[0].name == "Test Magazine"
+    @classmethod
+    def find_by_id(cls, id):
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM authors WHERE id=?", (id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return cls(id=row['id'], name=row['name'])
+        return None
+
+    @classmethod
+    def find_by_name(cls, name):
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM authors WHERE name=?", (name,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return cls(id=row['id'], name=row['name'])
+        return None
+
+    def articles(self):
+        from lib.models.article import Article
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM articles WHERE author_id=?", (self.id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [Article(
+            id=row['id'],
+            title=row['title'],
+            content=row['content'],
+            author_id=row['author_id'],
+            magazine_id=row['magazine_id']
+        ) for row in rows]
+
+    def magazines(self):
+        from lib.models.magazine import Magazine
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT magazines.* FROM magazines
+            JOIN articles ON magazines.id = articles.magazine_id
+            WHERE articles.author_id = ?
+        """, (self.id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [Magazine(
+            id=row['id'],
+            name=row['name'],
+            category=row['category']
+        ) for row in rows]

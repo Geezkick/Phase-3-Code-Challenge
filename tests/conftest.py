@@ -1,26 +1,32 @@
+# tests/conftest.py
 import pytest
 from lib.db.connection import get_connection
-from lib.db.schema import create_tables
+from lib.models.author import Author
+from lib.models.article import Article
+from lib.models.magazine import Magazine
 
-@pytest.fixture(autouse=True)
-def db_setup():
-    """Initialize fresh database for each test"""
+@pytest.fixture
+def setup_database():
     conn = get_connection()
-    create_tables(conn)
-    
-    # Optional: Add test data
     cursor = conn.cursor()
-    cursor.executescript("""
-        INSERT INTO authors (name) VALUES ('Test Author');
-        INSERT INTO magazines (name, category) VALUES ('Test Magazine', 'Test Category');
-        INSERT INTO articles (title, author_id, magazine_id) 
-        VALUES ('Test Article', 1, 1);
-    """)
+    # Clear tables
+    cursor.execute("DELETE FROM articles")
+    cursor.execute("DELETE FROM authors")
+    cursor.execute("DELETE FROM magazines")
     conn.commit()
-    
-    yield  # Test runs here
-    
-    # Cleanup
+    # Insert test data
+    author = Author.create("Test Author")
+    magazine = Magazine.create("Test Magazine", "Test Category")
+    cursor.execute(
+        "INSERT INTO articles (title, content, author_id, magazine_id) VALUES (?, ?, ?, ?)",
+        ("Test Article", "Content", author.id, magazine.id)
+    )
+    conn.commit()
+    conn.close()
+    yield
+    # Clean up after tests
+    conn = get_connection()
+    cursor = conn.cursor()
     cursor.execute("DELETE FROM articles")
     cursor.execute("DELETE FROM authors")
     cursor.execute("DELETE FROM magazines")
